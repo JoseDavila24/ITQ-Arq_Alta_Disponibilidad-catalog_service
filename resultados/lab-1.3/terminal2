@@ -1,0 +1,94 @@
+chema@fedora:~/Downloads/catalog-service$ curl -s http://localhost:8080/v1/products | jq .
+{
+  "status": "SUCCESS",
+  "data": [
+    "Product A",
+    "Product B",
+    "Product C"
+  ]
+}
+chema@fedora:~/Downloads/catalog-service$ curl -s http://localhost:8080/health | jq .
+{
+  "status": "UP",
+  "checks": [
+    {
+      "name": "catalog-database-check",
+      "status": "UP"
+    }
+  ]
+}
+chema@fedora:~/Downloads/catalog-service$ curl -s http://localhost:8080/ready | jq .
+{
+  "status": "UP",
+  "checks": [
+    {
+      "name": "catalog-database-check",
+      "status": "UP"
+    }
+  ]
+}
+chema@fedora:~/Downloads/catalog-service$ curl -s http://localhost:8080/live | jq .
+{
+  "status": "UP",
+  "checks": []
+}
+chema@fedora:~/Downloads/catalog-service$ kubectl describe pod -l app=catalog-service
+Name:             catalog-service-6bb88c8d76-vk76f
+Namespace:        default
+Priority:         0
+Service Account:  default
+Node:             lab-k8s-control-plane/10.89.0.2
+Start Time:       Thu, 19 Nov 2026 13:08:22 -0600
+Labels:           app=catalog-service
+                  pod-template-hash=6bb88c8d76
+                  version=v1.0.0
+Annotations:      <none>
+Status:           Running
+IP:               10.244.0.5
+IPs:
+  IP:           10.244.0.5
+Controlled By:  ReplicaSet/catalog-service-6bb88c8d76
+Containers:
+  catalog-service:
+    Container ID:   containerd://9391b1356b4456556f3961df9643142c5ded599fa22b84022e231c2ff9fe1c00
+    Image:          22140248/catalog-service:1.0.0
+    Image ID:       docker.io/22140248/catalog-service@sha256:c4a790dfd11a5919ffb1924e1bbe002ab3deec4f1de1320857b7c224ea53f216
+    Port:           8080/TCP (http)
+    Host Port:      0/TCP (http)
+    State:          Running
+      Started:      Thu, 19 Nov 2026 13:08:34 -0600
+    Ready:          True
+    Restart Count:  0
+    Liveness:       http-get http://:8080/live delay=10s timeout=2s period=10s successThreshold=1 failureThreshold=3
+    Readiness:      http-get http://:8080/ready delay=5s timeout=2s period=5s successThreshold=1 failureThreshold=2
+    Environment:    <none>
+    Mounts:
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-tqslh (ro)
+Conditions:
+  Type                        Status
+  PodReadyToStartContainers   True 
+  Initialized                 True 
+  Ready                       True 
+  ContainersReady             True 
+  PodScheduled                True 
+Volumes:
+  kube-api-access-tqslh:
+    Type:                    Projected (a volume that contains injected data from multiple sources)
+    TokenExpirationSeconds:  3607
+    ConfigMapName:           kube-root-ca.crt
+    Optional:                false
+    DownwardAPI:             true
+QoS Class:                   BestEffort
+Node-Selectors:              <none>
+Tolerations:                 node.kubernetes.io/not-ready:NoExecute op=Exists for 300s
+                             node.kubernetes.io/unreachable:NoExecute op=Exists for 300s
+Events:
+  Type     Reason     Age                    From               Message
+  ----     ------     ----                   ----               -------
+  Normal   Scheduled  4m8s                   default-scheduler  Successfully assigned default/catalog-service-6bb88c8d76-vk76f to lab-k8s-control-plane
+  Normal   Pulling    4m7s                   kubelet            spec.containers{catalog-service}: Pulling image "22140248/catalog-service:1.0.0"
+  Normal   Pulled     3m56s                  kubelet            spec.containers{catalog-service}: Successfully pulled image "22140248/catalog-service:1.0.0" in 10.981s (10.981s including waiting). Image size: 179242258 bytes.
+  Normal   Created    3m56s                  kubelet            spec.containers{catalog-service}: Container created
+  Normal   Started    3m56s                  kubelet            spec.containers{catalog-service}: Container started
+  Warning  Unhealthy  2m46s (x2 over 3m36s)  kubelet            spec.containers{catalog-service}: Readiness probe failed: HTTP probe failed with statuscode: 503
+chema@fedora:~/Downloads/catalog-service$ 
