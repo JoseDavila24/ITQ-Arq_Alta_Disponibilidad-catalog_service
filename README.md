@@ -57,7 +57,7 @@ Además, [`resilience-sample.txt`](resultados/lab%201-1%20y%201-2/Logs/resilienc
 
 ---
 
-## 🧪 Laboratorio 1.3: Despliegue en Kubernetes
+## 🧪 Laboratorio 1.3: De Docker a Kubernetes Local
 
 📄 **Reporte general (PDF en Google Drive):** [Abrir reporte del Lab 1.3](https://drive.google.com/file/d/1LX9U26GhOGiUgZDrUVCpQVQI_DKymnCv/view?usp=sharing)
 
@@ -83,7 +83,7 @@ resultados/lab-1.3/
 | 3 | `podman push`, borrado local y `podman pull` | Mismo ID de imagen (`9ef9fe52cbb9`) descargado desde Docker Hub |
 | 4 | `kubectl apply` de [`k8s/01-deployment.yaml`](k8s/01-deployment.yaml) y [`k8s/02-service.yaml`](k8s/02-service.yaml) | Deployment `1/1`, pod `Running` con **0 reinicios**, Service `ClusterIP` en 8080 |
 | 5 | `port-forward` + `curl` a `/v1/products`, `/health`, `/ready`, `/live` | Todos responden `SUCCESS` / `UP` |
-| 6 | `kubectl describe pod` | Readiness y liveness probes activas; 2 fallas aisladas de `/ready` (503) que se esperaban por la simulación del 5 %, sin sacar al pod de servicio |
+| 6 | `kubectl describe pod` | Imagen descargada desde Docker Hub; pod `Ready: True` con probes activas; 2 fallas aisladas de `/ready` (503), esperadas por la simulación del 5 % |
 
 👉 Detalle completo en el [mini reporte del Lab 1.3](resultados/lab-1.3/Reporte%20de%20Laboratorio%201.3.md).
 

@@ -1,7 +1,7 @@
 ---
 Maestro: IVONNE TATIANA ALCANTARA LLANAS
 ---
-# Reporte de Laboratorio 1.3: Despliegue en Kubernetes
+# Reporte de Laboratorio 1.3: De Docker a Kubernetes Local
 
 📄 **Reporte formal (PDF en Google Drive):** [Abrir reporte del Lab 1.3](https://drive.google.com/file/d/1LX9U26GhOGiUgZDrUVCpQVQI_DKymnCv/view?usp=sharing)
 🐳 **Imagen en Docker Hub:** [`22140248/catalog-service:1.0.0`](https://hub.docker.com/repository/docker/22140248/catalog-service/general)
@@ -10,104 +10,111 @@ Maestro: IVONNE TATIANA ALCANTARA LLANAS
 
 | Campo | Valor |
 |---|---|
-| **Laboratorio** | Clase 1.3: Despliegue de `catalog-service` en Kubernetes |
-| **Servicio** | `catalog-service` (Quarkus 3.38.0, OpenJDK 25) |
+| **Laboratorio** | Clase 1.3: De Docker a Kubernetes Local |
+| **Servicio** | `catalog-service` resiliente del Lab 1.2 (`@Timeout`, `@Retry`, `@CircuitBreaker`, `@Fallback`) |
 | **Imagen** | `docker.io/22140248/catalog-service:1.0.0` |
-| **Herramientas** | Maven, Podman, Docker Hub, kind, kubectl |
-| **Clúster** | kind, nodo `lab-k8s-control-plane` |
-| **Entorno** | Fedora (`chema@fedora`) |
-| **Evidencias** | [`terminal1`](terminal1) (build, imagen y despliegue) y [`terminal2`](terminal2) (pruebas y `describe`) |
+| **Motor de contenedores** | Podman (compatible con los comandos de Docker de la guía) |
+| **Kubernetes local** | Kind, nodo `lab-k8s-control-plane` |
+| **Entorno** | Fedora, OpenJDK 25, Quarkus 3.38.0 |
+| **Evidencias** | [`terminal1`](terminal1) (build, imagen y despliegue) y [`terminal2`](terminal2) (pruebas con `curl` y `kubectl describe pod`) |
 
 ## 2. Objetivo
 
-Llevar el servicio que en los laboratorios 1.1 y 1.2 corría en modo dev a un entorno orquestado:
+Empaquetar el `catalog-service` del Lab 1.2 en una imagen de contenedor, publicarla en Docker Hub y desplegarla en un clúster Kubernetes local con archivos YAML. La idea es ver la diferencia entre ejecutar un contenedor de forma **imperativa** (`docker run`) y **declararlo** en Kubernetes, donde el clúster además valida los health checks automáticamente.
 
-1. Empaquetar la aplicación y construir una imagen de contenedor.
-2. Publicar la imagen en un registro público (Docker Hub).
-3. Desplegarla en Kubernetes con un `Deployment` y un `Service`.
-4. Hacer que Kubernetes valide por sí mismo los endpoints `/ready` y `/live`, que en el Lab 1.1 se revisaron a mano con `curl`.
+> **Nota sobre Podman:** la guía usa `docker`; en Fedora se usó `podman`, que acepta los mismos comandos (`build`, `login`, `push`, `image rm`, `pull`). Por eso las imágenes llevan el prefijo explícito `docker.io/`.
 
 ## 3. Procedimiento
 
-### 3.1 Compilación con Maven
+### Paso 1: Kubernetes local
 
-Se empaquetó la aplicación (`target/quarkus-app/`) y el build terminó con `BUILD SUCCESS` en 53.5 s.
+El clúster Kind ya estaba corriendo como contenedor (`podman ps` muestra `lab-k8s-control-plane` en `127.0.0.1:45577->6443`), y `kubectl` estaba conectado a él.
 
-### 3.2 Construcción de la imagen con Podman
+### Paso 2: Construir la imagen y subirla a Docker Hub
 
 ```bash
-podman build -t docker.io/22140248/catalog-service:1.0.0 .
+./mvnw clean package -DskipTests                           # BUILD SUCCESS (53.5 s)
+podman build -t docker.io/22140248/catalog-service:1.0.0 .  # 11 pasos, imagen 9ef9fe52cbb9 (484 MB)
+podman login docker.io                                      # Login Succeeded!
+podman push docker.io/22140248/catalog-service:1.0.0        # Writing manifest to image destination
+podman image rm docker.io/22140248/catalog-service:1.0.0    # Untagged + Deleted
+podman pull docker.io/22140248/catalog-service:1.0.0        # Se descarga de nuevo: 9ef9fe52cbb9
 ```
 
-El `Dockerfile` parte de `registry.access.redhat.com/ubi9/openjdk-25-runtime:1.24`, copia las capas de `quarkus-app`, expone el puerto 8080 y se ejecuta con el usuario sin privilegios `185`. La imagen quedó en **484 MB** (ID `9ef9fe52cbb9`).
+La imagen descargada de Docker Hub tiene el **mismo ID** (`9ef9fe52cbb9`) que la construida localmente, así que lo publicado es exactamente lo que se compiló.
 
-### 3.3 Publicación en Docker Hub y comprobación
+### Paso 3: Despliegue con YAML
 
-```bash
-podman login docker.io
-podman push docker.io/22140248/catalog-service:1.0.0
-podman image rm docker.io/22140248/catalog-service:1.0.0
-podman pull docker.io/22140248/catalog-service:1.0.0
+En [`k8s/01-deployment.yaml`](../../k8s/01-deployment.yaml) se cambió el campo `image`:
+
+```yaml
+image: 22140248/catalog-service:1.0.0
+imagePullPolicy: IfNotPresent
 ```
 
-Después del `push` se borró la imagen local y se volvió a descargar desde Docker Hub. El ID obtenido fue el mismo (`9ef9fe52cbb9`), así que la imagen publicada es la que se construyó.
-
-### 3.4 Despliegue en Kubernetes
-
-En [`k8s/01-deployment.yaml`](../../k8s/01-deployment.yaml) se cambió el marcador `<tu-usuario-dockerhub>` por `22140248`. Luego se aplicaron los manifiestos:
+[`k8s/02-service.yaml`](../../k8s/02-service.yaml) se dejó sin cambios (`ClusterIP`, puerto 8080). Luego:
 
 ```bash
-kubectl apply -f k8s/01-deployment.yaml
-kubectl apply -f k8s/02-service.yaml
+kubectl apply -f k8s/01-deployment.yaml   # deployment.apps/catalog-service created
+kubectl apply -f k8s/02-service.yaml      # service/catalog-service created
 ```
 
-| Recurso | Configuración principal |
-|---|---|
-| `Deployment` | 1 réplica, imagen `22140248/catalog-service:1.0.0`, puerto 8080 |
-| `readinessProbe` | `GET /ready`, delay 5 s, cada 5 s, timeout 2 s, `failureThreshold` 2 |
-| `livenessProbe` | `GET /live`, delay 10 s, cada 10 s, timeout 2 s, `failureThreshold` 3 |
-| `Service` | `ClusterIP`, puerto 8080 → `targetPort` 8080 |
+| Probe | Endpoint | Configuración |
+|---|---|---|
+| `readinessProbe` | `GET /ready` | delay 5 s, cada 5 s, timeout 2 s, `failureThreshold` 2 |
+| `livenessProbe` | `GET /live` | delay 10 s, cada 10 s, timeout 2 s, `failureThreshold` 3 |
 
-### 3.5 Acceso y pruebas
+### Paso 4: Validar funcionamiento
 
 ```bash
+kubectl get deployment catalog-service
+kubectl get pods -l app=catalog-service
+kubectl get service catalog-service
 kubectl port-forward svc/catalog-service 8080:8080
-curl -s http://localhost:8080/v1/products | jq .
-curl -s http://localhost:8080/health | jq .
-curl -s http://localhost:8080/ready | jq .
-curl -s http://localhost:8080/live | jq .
+curl -s http://localhost:8080/v1/products | jq .   # y /health, /ready, /live
 kubectl describe pod -l app=catalog-service
 ```
 
-## 4. Resultados
+## 4. Criterios de aceptación
 
-| Verificación | Resultado |
-|---|---|
-| `kubectl get deployment` | `READY 1/1`, `AVAILABLE 1` |
-| `kubectl get pods` | `catalog-service-6bb88c8d76-vk76f`: `1/1 Running`, **0 reinicios** |
-| `kubectl get service` | `ClusterIP 10.96.124.39`, puerto `8080/TCP` |
-| `GET /v1/products` | `{"status":"SUCCESS","data":["Product A","Product B","Product C"]}` |
-| `GET /health` | `UP` (`catalog-database-check: UP`) |
-| `GET /ready` | `UP` (`catalog-database-check: UP`) |
-| `GET /live` | `UP` |
-| Imagen descargada por el nodo | `Successfully pulled image "22140248/catalog-service:1.0.0" in 10.981s` (179 MB comprimida) |
-| Condiciones del pod | `Ready`, `ContainersReady`, `Initialized` y `PodScheduled` en `True` |
+| # | Criterio de la guía | Evidencia | Estado |
+|---|---|---|---|
+| 1 | Imagen construida y publicada en Docker Hub | `podman build` + `podman push` en `terminal1`; tag `1.0.0` en [Docker Hub](https://hub.docker.com/repository/docker/22140248/catalog-service/general) | ✅ |
+| 2 | YAML actualizado con mi repositorio | `image: 22140248/catalog-service:1.0.0` en `k8s/01-deployment.yaml` | ✅ |
+| 3 | Pod `Running` y `READY 1/1`, descargado desde Docker Hub | `catalog-service-6bb88c8d76-vk76f 1/1 Running 0`; eventos `Pulling` → `Successfully pulled image "22140248/catalog-service:1.0.0" in 10.981s` → `Created` → `Started` | ✅ |
+| 3 | Health checks validados automáticamente | `kubectl describe` muestra las probes `Liveness` y `Readiness` configuradas, condición `Ready: True`, `Restart Count: 0` | ✅ (ver nota 5.1) |
+| 4 | `/v1/products` responde `SUCCESS` o `DEGRADED_CACHE` | `{"status":"SUCCESS","data":["Product A","Product B","Product C"]}` | ✅ |
+| 4 | `/health`, `/ready`, `/live` responden `UP` | Los tres con `"status": "UP"` en `terminal2` | ✅ |
 
-### Observación: readiness probe con 503
+Resultados de `kubectl get`:
 
-En los eventos del pod aparece:
+```text
+deployment  catalog-service   READY 1/1   UP-TO-DATE 1   AVAILABLE 1
+pod         catalog-service-6bb88c8d76-vk76f   1/1   Running   RESTARTS 0
+service     catalog-service   ClusterIP   10.96.124.39   8080/TCP
+```
+
+## 5. Observaciones
+
+### 5.1 No aparecen eventos "Readiness probe succeeded"
+
+La guía sugiere buscar líneas como `Readiness probe succeeded` en los eventos. En la práctica, el `kubelet` **solo registra eventos cuando una probe falla**; los éxitos no generan eventos. Por eso la prueba de que las probes se ejecutan con éxito está en el estado del pod:
+
+- `Ready: True` y `ContainersReady: True`, que solo se alcanzan si la `readinessProbe` responde bien.
+- `Restart Count: 0`, que indica que la `livenessProbe` nunca falló 3 veces seguidas.
+
+### 5.2 Dos fallas de readiness (HTTP 503)
 
 ```text
 Warning  Unhealthy  2m46s (x2 over 3m36s)  kubelet  Readiness probe failed: HTTP probe failed with statuscode: 503
 ```
 
-Es lo que se esperaba. `ReadinessHealthCheck` simula un clúster de base de datos que falla el **5 %** de las veces y en ese caso responde `DOWN` (HTTP 503). Kubernetes detectó esas dos fallas aisladas. Como `failureThreshold` es 2 y las fallas no fueron consecutivas, el pod siguió `Ready` y nunca salió del `Service`. La *liveness probe* no falló ni una vez, por eso el contador de reinicios quedó en 0.
+Estas fallas son esperadas: `ReadinessHealthCheck` simula que la base de datos falla el **5 %** de las veces y en ese caso responde `DOWN` (503). Que aparezcan es justamente la prueba de que Kubernetes revisa `/ready` por sí solo. Como fueron fallas aisladas (no 2 seguidas, que es el `failureThreshold`), el pod nunca salió del `Service`.
 
-## 5. Conclusión
+## 6. Explicación técnica integrada
 
-El `catalog-service` quedó empaquetado como imagen inmutable, publicado en Docker Hub y desplegado en un clúster de Kubernetes. Los health checks que en el Lab 1.1 se revisaban a mano ahora los ejecuta el `kubelet` de forma continua:
+Compilé el servicio con Maven y construí con Podman la imagen `22140248/catalog-service:1.0.0`. La subí a Docker Hub y, para comprobar que se podía descargar desde cualquier equipo, la borré localmente y la volví a bajar con el mismo ID. Después declaré el despliegue en `k8s/01-deployment.yaml`: qué imagen usar, desde mi repositorio de Docker Hub, y qué health checks ejecutar. Al aplicar el YAML, Kubernetes descargó la imagen (evento `Successfully pulled image`), creó el contenedor y comenzó a validar automáticamente `/ready` cada 5 segundos y `/live` cada 10. En el Lab 1.1 yo revisaba esos endpoints a mano con `curl`; ahora es el clúster quien lo hace. Si `/ready` falla, el pod deja de recibir tráfico; si `/live` falla, el contenedor se reinicia. Las dos fallas simuladas de `/ready` mostraron este control en acción, sin afectar el servicio. El flujo completo es: build local → push al registry → deploy declarativo → validación automática por Kubernetes.
 
-- **Readiness** decide si el pod recibe tráfico. Así se vio con las fallas simuladas de `/ready`: el servicio no se marcó como no disponible por una falla aislada.
-- **Liveness** decide si el contenedor se reinicia. No hizo falta ningún reinicio.
+## 7. Conclusión
 
-Con esto el servicio queda listo para los siguientes pasos de alta disponibilidad: más réplicas, *rolling updates* y observabilidad.
+La aplicación es la misma del Lab 1.2, con sus patrones de resiliencia; lo que cambió es cómo se ejecuta. En lugar de un `docker run` manual, un archivo YAML describe el estado deseado y Kubernetes se encarga de descargar la imagen, arrancarla y vigilar su salud. Estos manifiestos y esta imagen son la base para la Unidad 2, donde se agregarán réplicas, escalamiento automático y configuración externa.
