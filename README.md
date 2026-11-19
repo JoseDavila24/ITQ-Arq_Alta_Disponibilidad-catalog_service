@@ -84,6 +84,7 @@ resultados/lab-1.3/
 | 4 | `kubectl apply` de [`k8s/01-deployment.yaml`](k8s/01-deployment.yaml) y [`k8s/02-service.yaml`](k8s/02-service.yaml) | Deployment `1/1`, pod `Running` con **0 reinicios**, Service `ClusterIP` en 8080 |
 | 5 | `port-forward` + `curl` a `/v1/products`, `/health`, `/ready`, `/live` | Todos responden `SUCCESS` / `UP` |
 | 6 | `kubectl describe pod` | Imagen descargada desde Docker Hub; pod `Ready: True` con probes activas; 2 fallas aisladas de `/ready` (503), esperadas por la simulación del 5 % |
+| 7 | Limpieza: `kubectl delete` del Deployment y el Service, `kind delete cluster` y `podman logout` | Recursos y clúster eliminados; la imagen sigue disponible en Docker Hub |
 
 👉 Detalle completo en el [mini reporte del Lab 1.3](resultados/lab-1.3/Reporte%20de%20Laboratorio%201.3.md).
 

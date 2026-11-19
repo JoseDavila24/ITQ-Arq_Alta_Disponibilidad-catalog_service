@@ -16,7 +16,7 @@ Maestro: IVONNE TATIANA ALCANTARA LLANAS
 | **Motor de contenedores** | Podman (compatible con los comandos de Docker de la guía) |
 | **Kubernetes local** | Kind, nodo `lab-k8s-control-plane` |
 | **Entorno** | Fedora, OpenJDK 25, Quarkus 3.38.0 |
-| **Evidencias** | [`terminal1`](terminal1) (build, imagen y despliegue) y [`terminal2`](terminal2) (pruebas con `curl` y `kubectl describe pod`) |
+| **Evidencias** | [`terminal1`](terminal1) (build, imagen y despliegue) y [`terminal2`](terminal2) (pruebas con `curl` y `kubectl describe pod`). La limpieza (Paso 5) se registra solo con los comandos |
 
 ## 2. Objetivo
 
@@ -74,6 +74,22 @@ kubectl port-forward svc/catalog-service 8080:8080
 curl -s http://localhost:8080/v1/products | jq .   # y /health, /ready, /live
 kubectl describe pod -l app=catalog-service
 ```
+
+### Paso 5: Limpieza
+
+Al terminar las pruebas se liberaron todos los recursos:
+
+```bash
+# Ctrl + C en la terminal del port-forward para cerrar el túnel
+kubectl delete deployment catalog-service   # Elimina el Deployment y su pod
+kubectl delete service catalog-service      # Elimina el Service
+kind delete cluster --name lab-k8s          # Elimina el clúster Kind completo
+podman logout docker.io                     # Cierra la sesión de Docker Hub
+```
+
+Además de lo que pide la guía, se eliminó el clúster Kind para liberar recursos de la máquina y se cerró la sesión en Docker Hub para no dejar credenciales guardadas. La imagen no se pierde porque sigue publicada en Docker Hub, y los manifiestos de `k8s/` permiten volver a desplegarla igual en la Unidad 2.
+
+> Las salidas de estos comandos no se guardaron; aquí solo se registran los comandos ejecutados.
 
 ## 4. Criterios de aceptación
 
